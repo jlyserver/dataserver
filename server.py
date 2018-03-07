@@ -187,6 +187,8 @@ class IndexNewHandler(tornado.web.RequestHandler):
                 cache.set(key, val, conf.redis_timeout)
                 data = json.loads(val)
                 d = {'code': 0, 'msg':'ok', 'data':data}
+                print('sex=%d'%sex)
+                print(d)
                 d = json.dumps(d)
                 self.write(d)
                 self.finish()
@@ -207,18 +209,20 @@ class IndexNewHandler(tornado.web.RequestHandler):
                     d = json.loads(resp.body)
                 except:
                     d = None
+                print('sex=%d'%sex)
+                print(d)
                 r = None
                 if not d or d.get('code', -1) < 0:
                     r = {'code': -1, 'msg':'failed', 'data':{}}
                 else:
                     r = {'code': 0, 'msg': 'ok', 'data':d['data']}
-                    self.__store_cache(d)
+                    self.__store_cache(d, sex)
                 r = json.dumps(r)
                 self.write(r)
                 self.finish()
-    def __store_cache(self, d):
+    def __store_cache(self, d, sex):
         if d['code'] == 0 and d.get('data'):
-            key = 'user_new_male'
+            key = 'user_new_male' if sex == 1 else 'user_new_female'
             val = d['data']
             val = json.dumps(val)
             cache.set(key, val, conf.redis_timeout)
