@@ -17,8 +17,6 @@ from cache import cache
 
 define("port", default=conf.sys_port, help="run on the given port", type=int)
 
-def retcode(val, msg):
-    return {'code':val, 'msg':msg}
 
 class PCDataCtxHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -166,6 +164,64 @@ class PCIndexDataHandler(tornado.web.RequestHandler):
         r = resp.body
         self.write(r)
         self.finish()
+class IndexNewHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        sex   = int(self.get_argument('sex', 0))
+        limit = int(self.get_argument('limit', 0))
+        page  = int(self.get_argument('page',  0))
+        next_ = int(self.get_argument('next',  0))
+        if sex not in [1, 2] or limit < 1 or page < 1 or next_ != 0:
+            d = {'code':-1, 'msg':'error', 'data':{}}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
+        else:
+            if sex == 1:
+                key = 'user_new_male'
+            else:
+                key = 'user_new_female'
+            val = cache.get(key)
+            if val:
+                cache.set(key, val, conf.redis_timeout)
+                data = json.loads(val)
+                d = {'code': 0, 'msg':'ok', 'data':data}
+                d = json.dumps(d)
+                self.write(d)
+                self.finish()
+            else:
+                url = 'http://%s:%s/new' % (conf.dbserver_ip, conf.dbserver_port)
+                headers = self.request.headers
+                body = 'sex=%d&limit=%d&page=%d&next=%d'%(sex,limit, page, next_)
+                http_client = tornado.httpclient.AsyncHTTPClient()
+                resp = yield tornado.gen.Task(
+                        http_client.fetch,
+                        url,
+                        method="POST",
+                        headers=headers,
+                        body=body,
+                        validate_cert=False)
+                d = None
+                try:
+                    d = json.loads(resp.body)
+                except:
+                    d = None
+                r = None
+                if not d or d.get('code', -1) < 0:
+                    r = {'code': -1, 'msg':'failed', 'data':{}}
+                else:
+                    r = {'code': 0, 'msg': 'ok', 'data':d['data']}
+                    self.__store_cache(d)
+                r = json.dumps(r)
+                self.write(r)
+                self.finish()
+    def __store_cache(self, d):
+        if d['code'] == 0 and d.get('data'):
+            key = 'user_new_male'
+            val = d['data']
+            val = json.dumps(val)
+            cache.set(key, val, conf.redis_timeout)
 
 class PCDataRegistHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -360,6 +416,7 @@ if __name__ == "__main__":
                (r'/basic_edit', PCDataBasicEditHandler),
                (r'/statement_edit', PCDataStatementEditHandler),
                (r'/other_edit', PCDataOtherEditHandler),
+               (r'/new', IndexNewHandler),
               #(r'/publish', PCDataPublishHandler),
               ]
     application = tornado.web.Application(handler, **settings)

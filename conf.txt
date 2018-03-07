@@ -10,7 +10,7 @@ dbserver_port=9000
 redis_ip=127.0.0.1
 redis_port=6379
 redis_db=0
-redis_password=jly2017__
+redis_password=jly2017___
 redis_timeout=1200
 
 [mysql]
