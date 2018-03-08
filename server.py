@@ -226,6 +226,65 @@ class IndexNewHandler(tornado.web.RequestHandler):
             val = d['data']
             val = json.dumps(val)
             cache.set(key, val, conf.redis_timeout)
+class FindHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        sex          = int(self.get_argument('sex',     -1))
+        agemin       = int(self.get_argument('agemin',  -1))
+        agemax       = int(self.get_argument('agemax',  -1))
+        cur1         = self.get_argument('cur1',    None)
+        cur2         = self.get_argument('cur2',    None)
+        ori1         = self.get_argument('ori1',    None)
+        ori2         = self.get_argument('ori2',    None)
+        degree       = int(self.get_argument('degree', -1))
+        salary       = int(self.get_argument('salary', -1))
+        xz           = self.get_argument('xingzuo', None)
+        sx           = self.get_argument('shengxiao', None)
+        limit        = int(self.get_argument('limit', -1))
+        page         = int(self.get_argument('page', -1))
+        next_        = int(self.get_argument('next', -1))
+        key          = 'user_index_find'
+        val          = cache.get(key)
+        if agemin > agemax:
+            agemin, agemax = agemax, agemin
+        if sex < 0 and agemin < 0 and agemax < 0 and not cur1 and not cur2 and not ori1 and not ori2 and degree < 0 and salary < 0 and not xz and not sx limit < 0 and page < 0 and next_ < 0 and val:
+            cache.set(key, val, conf.redis_timeout)
+            d = json.loads(val)
+            self.write(d)
+            self.finish()
+        else:
+            url = 'http://%s:%s/find' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            d = None
+            try:
+                d = json.loads(resp.body)
+            except:
+                d = None
+            if not d or d.get('code', -1) != 0 or not d.get('data'):
+                d = {'code':-1, 'msg':'error', 'data':{}}
+                d = json.dumps(d)
+                self.write(d)
+                self.finish(d)
+            else:
+                if sex < 0 and agemin < 0 and agemax < 0 and not cur1 and not cur2 and not ori1 and not ori2 and degree < 0 and salary < 0 and not xz and not sx and limit < 0 and page < 0 and next_ < 0:
+                    v = d['data']
+                    v = josn.dumps(v)
+                    k = 'user_index_find'
+                    cache.set(k, v, conf.redis_timeout)
+                d = {'code':0, 'msg':'ok', 'data':d['data']}
+                d = json.dumps(d)
+                self.write(d)
+                self.finish()
 
 class PCDataRegistHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -421,6 +480,7 @@ if __name__ == "__main__":
                (r'/statement_edit', PCDataStatementEditHandler),
                (r'/other_edit', PCDataOtherEditHandler),
                (r'/new', IndexNewHandler),
+               (r'/find', FindHandler),
               #(r'/publish', PCDataPublishHandler),
               ]
     application = tornado.web.Application(handler, **settings)
