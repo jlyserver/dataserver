@@ -248,10 +248,12 @@ class FindHandler(tornado.web.RequestHandler):
         val          = cache.get(key)
         if agemin > agemax:
             agemin, agemax = agemax, agemin
-        if sex < 0 and agemin < 0 and agemax < 0 and not cur1 and not cur2 and not ori1 and not ori2 and degree < 0 and salary < 0 and not xz and not sx limit < 0 and page < 0 and next_ < 0 and val:
+        if sex < 0 and agemin < 0 and agemax < 0 and not cur1 and not cur2 and not ori1 and not ori2 and degree < 0 and salary < 0 and not xz and not sx and limit < 0 and page < 0 and next_ < 0 and val:
             cache.set(key, val, conf.redis_timeout)
             d = json.loads(val)
-            self.write(d)
+            data = {'code':0, 'msg':'ok', 'data':d}
+            data = json.dumps(data)
+            self.write(data)
             self.finish()
         else:
             url = 'http://%s:%s/find' % (conf.dbserver_ip, conf.dbserver_port)
@@ -278,10 +280,11 @@ class FindHandler(tornado.web.RequestHandler):
             else:
                 if sex < 0 and agemin < 0 and agemax < 0 and not cur1 and not cur2 and not ori1 and not ori2 and degree < 0 and salary < 0 and not xz and not sx and limit < 0 and page < 0 and next_ < 0:
                     v = d['data']
-                    v = josn.dumps(v)
+                    v = json.dumps(v)
                     k = 'user_index_find'
                     cache.set(k, v, conf.redis_timeout)
-                d = {'code':0, 'msg':'ok', 'data':d['data']}
+                d = {'code':0, 'msg':'ok', 'count':d.get('count', 0),
+                     'data':d['data']}
                 d = json.dumps(d)
                 self.write(d)
                 self.finish()
