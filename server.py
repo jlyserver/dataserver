@@ -76,10 +76,10 @@ class PCDataLoginHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
     def post(self):
-        name     = self.get_argument('username', None)
+        mobile = self.get_argument('mobile', None)
         password = self.get_argument('password', None)
-        if not name or not password:
-            r = {'code': -1, 'msg': 'username or password is null'}
+        if not mobile or not password:
+            r = {'code': -1}
             r = json.dumps(r)
             self.write(r)
             self.finish()
@@ -94,13 +94,12 @@ class PCDataLoginHandler(tornado.web.RequestHandler):
                 url = 'http://%s:%s/login' % (conf.dbserver_ip, conf.dbserver_port)
                 headers = self.request.headers
                 http_client = tornado.httpclient.AsyncHTTPClient()
-                body = 'username=%s&password=%s' % (name, password)
                 resp = yield tornado.gen.Task(
                         http_client.fetch,
                         url,
                         method="POST",
                         headers=headers,
-                        body=body,
+                        body=self.request.body,
                         validate_cert=False)
                 r = resp.body
                 d = None
@@ -108,33 +107,36 @@ class PCDataLoginHandler(tornado.web.RequestHandler):
                     d = json.loads(r)
                 except:
                     d = None
-                self.__store_cache(d, name, password)
+                self.__store_cache(d, mobile, password)
                 if not d:
-                    d = {'code': -1, 'msg':'inner error', 'data':{}}
+                    d = {'code': -1, 'msg':'dbserver returns None'}
                     d = json.dumps(d)
                     self.write(d)
                     self.finish()
-                elif d.get('code', -1) == -1:
-                    d = {'code': -1, 'msg':'用户名或密码错误', 'data':{}}
+                elif d.get('code', 0) != 0:
+                    d = {'code': -1, 'msg':'dbserver returns code=-1'}
                     d = json.dumps(d)
                     self.write(d)
                     self.finish()
                 else:
-                    self.write(r)
+                    data = d['data']
+                    d = {'code':0, 'msg':'ok', 'data':data}
+                    d = json.dumps(d)
+                    self.write(d)
                     self.finish()
     #store data in cache
-    def __store_cache(self, r, name, password):
+    def __store_cache(self, r, mobile, password):
         if not r:
             return False
         code = r.get('code', -1)
         data = r.get('data')
         if code == 0 and data:
-            key = 'user_%s_%s' % (name, password)
+            key = 'user_%s_%s' % (mobile, password)
             data = json.dumps(data)
             cache.set(key, data, conf.redis_timeout)
     #return dic
-    def __query_cache(self, name, password):
-        key = 'user_%s_%s' % (name, password)
+    def __query_cache(self, mobile, password):
+        key = 'user_%s_%s' % (mobile, password)
         val = cache.get(key)
         d   = None
         if val:
@@ -293,15 +295,18 @@ class PCDataRegistHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
     def post(self):
-        name    = self.get_argument('username', None)
+        mobile   = self.get_argument('mobile', None)
         passwd   = self.get_argument('password', None)
-        if not name or not passwd:
-            self.write('-1')
+        sex      = int(self.get_argument('sex', 0))
+        if not mobile or not passwd or sex not in [1,2]:
+            d = {'code':-1, 'msg':'parameters error'}
+            d = json.dumps(d)
+            self.write(d)
             self.finish()
         else:
             url = 'http://%s:%s/regist' % (conf.dbserver_ip, conf.dbserver_port)
             headers = self.request.headers
-            body = 'username=%s&password=%s' % (name, passwd)
+            body = 'mobile=%s&password=%s&sex=%d' % (mobile, passwd, sex)
             http_client = tornado.httpclient.AsyncHTTPClient()
             resp = yield tornado.gen.Task(
                     http_client.fetch,
@@ -311,6 +316,16 @@ class PCDataRegistHandler(tornado.web.RequestHandler):
                     body=body,
                     validate_cert=False)
             r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
+                d = {}
+            if not d:
+                d = {'code':-1, 'msg':'服务器错误'}
+            else:
+                d = {'code':d['code'], 'msg':d['msg']}
+            r = json.dumps(d)
             self.write(r)
             self.finish()
 class PCDataBasicEditHandler(tornado.web.RequestHandler):
