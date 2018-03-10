@@ -5,6 +5,7 @@ import tornado.ioloop
 import tornado.web
 import tornado.options
 import hashlib
+import random
 import os.path
 import json
 import time
@@ -14,6 +15,7 @@ from tornado.options import define, options
 
 from conf import conf
 from cache import cache
+from alimsg import sndmsg
 
 define("port", default=conf.sys_port, help="run on the given port", type=int)
 
@@ -291,6 +293,96 @@ class FindHandler(tornado.web.RequestHandler):
                 self.write(d)
                 self.finish()
 
+class PCDataVerifyHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        p = '^(1[356789])[0-9]{9}$'
+        mobile = self.get_argument('mobile', None)
+        ip     = self.get_argument('ip', None)
+        if not mobile or not re.match(p, mobile) or not ip:
+            d = {'code': -1, 'msg': 'invalid request'}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
+        else:
+            key = 'verify_%s'%ip
+            val = cache.get(key)
+            t = int(time.time())
+            if val:
+                d = json.loads(val)
+                if d['count'] > 10:
+                    d = {'code': -1, 'msg': 'invalid request'}
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+                else:
+                    if t-d['t'] >= 60:
+                        d['count'] = d['count'] + 1
+                        d['t'] = t
+                    if not d['data'].get(mobile):
+                        d['data'][mobile] = {'n':1, 't':t}
+                    elif d['data'][mobile]['n'] != 1 and t-d['data'][mobile]['t'] >= 60:
+                        d['data'][mobile]['n'] = d['data'][mobile]['n'] + 1
+                    if d['data'][mobile]['n'] > 6 or t-d['data'][mobile]['t'] < 60:
+                        v1 = json.dumps(d)
+                        cache.set(key, v1, conf.redis_timeout)
+                        D = {'code': -1, 'msg': 'invalid request'}
+                        D = json.dumps(D)
+                        self.write(D)
+                        self.finish()
+                    else:
+                        d['data'][mobile]['t'] = t
+                        d['data'][mobile]['n'] = d['data'][mobile]['n'] + 1
+                        v1 = json.dumps(d)
+                        cache.set(key, v1, conf.redis_timeout)
+                        a = random.randrange(0,10)
+                        b = random.randrange(0,10)
+                        c = random.randrange(0,10)
+                        d = random.randrange(0,10)
+                        code = '%d%d%d%d' % (a,b,c,d)
+                        r = sndmsg(mobile, code)
+                        if not r:
+                            d = {'code':-1, 'msg':'invalid number'}
+                            d = json.dumps(d)
+                            self.write(d)
+                            self.finish()
+                        else:
+                            sec = 'jly'
+                            m = '%s%d%s'%(code, t, sec)
+                            m2 = hashlib.md5()
+                            m2.update(m)
+                            token = m2.hexdigest()
+                            d = {'code':0, 'msg':'ok', 'time':t, 'token':token}
+                            d = json.dumps(d)
+                            self.write(d)
+                            self.finish()
+            else:
+                v = {'count':1, 't':t, 'data':{mobile:{'n':1, 't':t}}}
+                v = json.dumps(v)
+                cache.set(key, v, conf.redis_timeout)
+                a = random.randrange(0,10)
+                b = random.randrange(0,10)
+                c = random.randrange(0,10)
+                d = random.randrange(0,10)
+                code = '%d%d%d%d' % (a,b,c,d)
+                r = sndmsg(mobile, code)
+                if not r:
+                    d = {'code':-1, 'msg':'invalid number'}
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+                else:
+                    sec = 'jly'
+                    m = '%s%d%s'%(code, t, sec)
+                    m2 = hashlib.md5()
+                    m2.update(m)
+                    token = m2.hexdigest()
+                    d = {'code':0, 'msg':'ok', 'time':t, 'token':token}
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+      
 class PCDataRegistHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
@@ -493,6 +585,7 @@ if __name__ == "__main__":
                (r'/ctx', PCDataCtxHandler),
                (r'/login', PCDataLoginHandler),
                (r'/regist', PCDataRegistHandler),
+               (r'/verify', PCDataVerifyHandler),
                (r'/indexdata', PCIndexDataHandler),
                (r'/basic_edit', PCDataBasicEditHandler),
                (r'/statement_edit', PCDataStatementEditHandler),
