@@ -306,83 +306,174 @@ class PCDataVerifyHandler(tornado.web.RequestHandler):
             self.write(d)
             self.finish()
         else:
-            key = 'verify_%s'%ip
-            val = cache.get(key)
-            t = int(time.time())
-            if val:
-                d = json.loads(val)
-                if d['count'] > 10:
-                    d = {'code': -1, 'msg': 'invalid request'}
+            url = 'http://%s:%s/verify' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = 'mobile=%s' % mobile
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
+                d = {}
+            if d.get('code', -1) == 0:
+                r = {'code': -2,'msg':'already regist'}
+                r = json.dumps(r)
+                self.write(r)
+                self.finish()
+            else:
+                t = int(time.time())
+                print(mobile, ip)
+                mkey_n = 'verify_%s'%mobile
+                mv_n   = cache.get(mkey_n)
+                mkey_i = 'verify_%s'%ip
+                mv_i   = cache.get(mkey_i)
+                if mv_n or mv_i:
+                    d = {'code': -1, 'msg': 'not timeout'}
                     d = json.dumps(d)
                     self.write(d)
                     self.finish()
                 else:
-                    if t-d['t'] >= 60:
-                        d['count'] = d['count'] + 1
-                        d['t'] = t
-                    if not d['data'].get(mobile):
-                        d['data'][mobile] = {'n':1, 't':t}
-                    elif d['data'][mobile]['n'] != 1 and t-d['data'][mobile]['t'] >= 60:
-                        d['data'][mobile]['n'] = d['data'][mobile]['n'] + 1
-                    if d['data'][mobile]['n'] > 6 or t-d['data'][mobile]['t'] < 60:
-                        v1 = json.dumps(d)
-                        cache.set(key, v1, conf.redis_timeout)
-                        D = {'code': -1, 'msg': 'invalid request'}
-                        D = json.dumps(D)
-                        self.write(D)
+                    cache.set(mkey_n, mv_n, 60)
+                    cache.set(mkey_i, mv_i, 60)
+                    a = random.randrange(0,10)
+                    b = random.randrange(0,10)
+                    c = random.randrange(0,10)
+                    d = random.randrange(0,10)
+                    code = '%d%d%d%d' % (a,b,c,d)
+                    r = sndmsg(mobile, code)
+                    print(r)
+                    if not r:
+                        d = {'code':-1, 'msg':'invalid number'}
+                        d = json.dumps(d)
+                        self.write(d)
                         self.finish()
                     else:
-                        d['data'][mobile]['t'] = t
-                        d['data'][mobile]['n'] = d['data'][mobile]['n'] + 1
-                        v1 = json.dumps(d)
-                        cache.set(key, v1, conf.redis_timeout)
-                        a = random.randrange(0,10)
-                        b = random.randrange(0,10)
-                        c = random.randrange(0,10)
-                        d = random.randrange(0,10)
-                        code = '%d%d%d%d' % (a,b,c,d)
-                        r = sndmsg(mobile, code)
-                        if not r:
-                            d = {'code':-1, 'msg':'invalid number'}
-                            d = json.dumps(d)
-                            self.write(d)
-                            self.finish()
-                        else:
-                            sec = 'jly'
-                            m = '%s%d%s'%(code, t, sec)
-                            m2 = hashlib.md5()
-                            m2.update(m)
-                            token = m2.hexdigest()
-                            d = {'code':0, 'msg':'ok', 'time':t, 'token':token}
-                            d = json.dumps(d)
-                            self.write(d)
-                            self.finish()
+                        sec = 'jly'
+                        m = '%s%d%s'%(code, t, sec)
+                        m2 = hashlib.md5()
+                        m2.update(m)
+                        token = m2.hexdigest()
+                        d = {'code':0, 'msg':'ok', 'time':t, 'token':token}
+                        d = json.dumps(d)
+                        self.write(d)
+                        self.finish()
+
+class PCDataFindVerifyHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        p = '^(1[356789])[0-9]{9}$'
+        mobile = self.get_argument('mobile', None)
+        ip     = self.get_argument('ip', None)
+        if not mobile or not re.match(p, mobile) or not ip:
+            d = {'code': -1, 'msg': 'invalid request'}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
+        else:
+            url = 'http://%s:%s/find_verify' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = 'mobile=%s' % mobile
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
+                d = {}
+            if d.get('code', -1) == -1:
+                r = {'code': -1,'msg':'does not exist'}
+                r = json.dumps(r)
+                self.write(r)
+                self.finish()
             else:
-                v = {'count':1, 't':t, 'data':{mobile:{'n':1, 't':t}}}
-                v = json.dumps(v)
-                cache.set(key, v, conf.redis_timeout)
-                a = random.randrange(0,10)
-                b = random.randrange(0,10)
-                c = random.randrange(0,10)
-                d = random.randrange(0,10)
-                code = '%d%d%d%d' % (a,b,c,d)
-                r = sndmsg(mobile, code)
-                if not r:
-                    d = {'code':-1, 'msg':'invalid number'}
+                t = int(time.time())
+                print(mobile, ip)
+                mkey_n = 'verify_%s'%mobile
+                mv_n   = cache.get(mkey_n)
+                mkey_i = 'verify_%s'%ip
+                mv_i   = cache.get(mkey_i)
+                if mv_n or mv_i:
+                    d = {'code': -1, 'msg': 'not timeout'}
                     d = json.dumps(d)
                     self.write(d)
                     self.finish()
                 else:
-                    sec = 'jly'
-                    m = '%s%d%s'%(code, t, sec)
-                    m2 = hashlib.md5()
-                    m2.update(m)
-                    token = m2.hexdigest()
-                    d = {'code':0, 'msg':'ok', 'time':t, 'token':token}
-                    d = json.dumps(d)
-                    self.write(d)
-                    self.finish()
-      
+                    cache.set(mkey_n, mv_n, 60)
+                    cache.set(mkey_i, mv_i, 60)
+                    a = random.randrange(0,10)
+                    b = random.randrange(0,10)
+                    c = random.randrange(0,10)
+                    d = random.randrange(0,10)
+                    code = '%d%d%d%d' % (a,b,c,d)
+                    r = sndmsg(mobile, code)
+                    print(r)
+                    if not r:
+                        d = {'code':-1, 'msg':'invalid number'}
+                        d = json.dumps(d)
+                        self.write(d)
+                        self.finish()
+                    else:
+                        sec = 'jly'
+                        m = '%s%d%s'%(code, t, sec)
+                        m2 = hashlib.md5()
+                        m2.update(m)
+                        token = m2.hexdigest()
+                        d = {'code':0, 'msg':'ok', 'time':t, 'token':token}
+                        d = json.dumps(d)
+                        self.write(d)
+                        self.finish()
+
+class PCDataFindPasswordHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        mobile = self.get_argument('mobile', None)
+        passwd = self.get_argument('password', None)
+        d = {}
+        if not mobile or not passwd:
+            d = {'code': -6, 'msg': 'mobile or password is null'}
+        else:
+            url = 'http://%s:%s/find_password' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = 'mobile=%s&password=%s' % (mobile, passwd)
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            D = {}
+            try:
+                D = json.loads(D)
+            except:
+                D = {}
+            if not D or D.get('code', -1) != 0:
+                d = {'code': -1, 'msg':'failed'}
+            else:
+                d = {'code': 0, 'msg': 'ok'}
+        d = json.dumps(d)
+        self.write(d)
+        self.finish()
+
 class PCDataRegistHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
@@ -586,6 +677,8 @@ if __name__ == "__main__":
                (r'/login', PCDataLoginHandler),
                (r'/regist', PCDataRegistHandler),
                (r'/verify', PCDataVerifyHandler),
+               (r'/find_verify', PCDataFindVerifyHandler),
+               (r'/find_password', PCDataFindPasswordHandler),
                (r'/indexdata', PCIndexDataHandler),
                (r'/basic_edit', PCDataBasicEditHandler),
                (r'/statement_edit', PCDataStatementEditHandler),

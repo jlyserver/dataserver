@@ -9,8 +9,6 @@ Created on 2017-06-12
 """
 REGION = "cn-hangzhou"# 暂时不支持多region
 # ACCESS_KEY_ID/ACCESS_KEY_SECRET 根据实际申请的账号信息进行替换
-ACCESS_KEY_ID = "LTAIOBW4JrRuFQyb"
-ACCESS_KEY_SECRET = "1CtXQhV1CuUGODdHgQHO4djPRgXCaD"
 acs_client = AcsClient(ACCESS_KEY_ID, ACCESS_KEY_SECRET, REGION)
 # 请参考本文档步骤2
 def send_sms(business_id, phone_number, sign_name, template_code, template_param=None):
@@ -36,7 +34,7 @@ def sndmsg(mobile, code):
     params = "{\"code\":\"%s\"}" % str(code)
     r = send_sms(__business_id, mobile, "佳良缘", "SMS_126875067", params)
     d = json.loads(r)
-    return d['Code']
+    return True if d['Code'] == 'OK' else False
 
 if __name__ == '__main__':
    r = sndmsg('17313615918', 200302)
