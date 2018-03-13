@@ -43,16 +43,16 @@ class PCDataCtxHandler(tornado.web.RequestHandler):
                 self.write(r)
             else:
                 carr = cookie.split('_')
-                if len(carr) != 3:
+                if len(carr) != 4:
                     r = {'code': -2, 'data': {}, 'msg': 'cookie is invalid'}
                     r = json.dumps(r)
                     self.write(r)
                 else:
-                    [user, name, password] = carr
+                    [user, way, mobile, password] = carr
                     url = 'http://%s:%s/ctx' % (conf.dbserver_ip, conf.dbserver_port)
                     headers = self.request.headers
                     http_client = tornado.httpclient.AsyncHTTPClient()
-                    body = 'username=%s&password=%s' % (name, password)
+                    body = 'mobile=%s&password=%s' % (mobile, password)
                     resp = yield tornado.gen.Task(
                             http_client.fetch,
                             url,
@@ -86,7 +86,7 @@ class PCDataLoginHandler(tornado.web.RequestHandler):
             self.write(r)
             self.finish()
         else:
-            r = self.__query_cache(name, password)
+            r = self.__query_cache(mobile, password)
             if r:
                 d = {'code':0, 'msg':'ok', 'data': r}
                 d = json.dumps(d)
@@ -133,12 +133,12 @@ class PCDataLoginHandler(tornado.web.RequestHandler):
         code = r.get('code', -1)
         data = r.get('data')
         if code == 0 and data:
-            key = 'user_%s_%s' % (mobile, password)
+            key = 'user_tel_%s_%s' % (mobile, password)
             data = json.dumps(data)
             cache.set(key, data, conf.redis_timeout)
     #return dic
     def __query_cache(self, mobile, password):
-        key = 'user_%s_%s' % (mobile, password)
+        key = 'user_tel_%s_%s' % (mobile, password)
         val = cache.get(key)
         d   = None
         if val:
