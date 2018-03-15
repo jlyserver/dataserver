@@ -366,6 +366,46 @@ class PCDataVerifyHandler(tornado.web.RequestHandler):
                         self.write(d)
                         self.finish()
 
+class PCDataVerifyMobileHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        mobile  = self.get_argument('mobile', None)
+        uid     = self.get_argument('uid',    None)
+        d = {}
+        p = '^(1[356789])[0-9]{9}$'
+        if not uid or not mobile or not re.match(p, mobile):
+            d = {'code': -1, 'msg': 'parameter invalid'}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
+        else:
+            url = 'http://%s:%s/verify_mobile' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = 'mobile=%s&uid=%s' % (mobile, uid)
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
+                d = {}
+            if not d or d.get('code', -1) != 0:
+                d = {'code': -1, 'msg': d.get('msg', 'parameter invalid')}
+                d = json.dumps(d)
+            else:
+                d = {'code': 0, 'msg':'ok', 'data':d['data']}
+                d = json.dumps(d)
+            self.write(d)
+            self.finish()
+
 class PCDataFindVerifyHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
@@ -677,6 +717,7 @@ if __name__ == "__main__":
                (r'/login', PCDataLoginHandler),
                (r'/regist', PCDataRegistHandler),
                (r'/verify', PCDataVerifyHandler),
+               (r'/verify_mobile', PCDataVerifyMobileHandler),
                (r'/find_verify', PCDataFindVerifyHandler),
                (r'/find_password', PCDataFindPasswordHandler),
                (r'/indexdata', PCIndexDataHandler),
