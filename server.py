@@ -43,16 +43,16 @@ class PCDataCtxHandler(tornado.web.RequestHandler):
                 self.write(r)
             else:
                 carr = cookie.split('_')
-                if len(carr) != 4:
+                if len(carr) != 2:
                     r = {'code': -2, 'data': {}, 'msg': 'cookie is invalid'}
                     r = json.dumps(r)
                     self.write(r)
                 else:
-                    [user, way, mobile, password] = carr
+                    [user, uid] = carr
                     url = 'http://%s:%s/ctx' % (conf.dbserver_ip, conf.dbserver_port)
                     headers = self.request.headers
                     http_client = tornado.httpclient.AsyncHTTPClient()
-                    body = 'mobile=%s&password=%s' % (mobile, password)
+                    body = 'uid=%s' % uid
                     resp = yield tornado.gen.Task(
                             http_client.fetch,
                             url,
@@ -323,8 +323,10 @@ class PCDataVerifyHandler(tornado.web.RequestHandler):
                 d = json.loads(r)
             except:
                 d = {}
-            if d.get('code', -1) == 0:
-                r = {'code': -2,'msg':'already regist'}
+            if not d:
+                d = {'code': -1, 'msg': '服务器错误'}
+            elif d['code'] < 0:
+                r = {'code': -2,'msg':'手机号码已经注册了'}
                 r = json.dumps(r)
                 self.write(r)
                 self.finish()
@@ -336,7 +338,7 @@ class PCDataVerifyHandler(tornado.web.RequestHandler):
                 mkey_i = 'verify_%s'%ip
                 mv_i   = cache.get(mkey_i)
                 if mv_n or mv_i:
-                    d = {'code': -1, 'msg': 'not timeout'}
+                    d = {'code': -1, 'msg': '不要频繁发送验证码'}
                     d = json.dumps(d)
                     self.write(d)
                     self.finish()
@@ -351,7 +353,7 @@ class PCDataVerifyHandler(tornado.web.RequestHandler):
                     r = sndmsg(mobile, code)
                     print(r)
                     if not r:
-                        d = {'code':-1, 'msg':'invalid number'}
+                        d = {'code':-1, 'msg':'获取验证码失败,可能手机号不正确'}
                         d = json.dumps(d)
                         self.write(d)
                         self.finish()
@@ -361,7 +363,7 @@ class PCDataVerifyHandler(tornado.web.RequestHandler):
                         m2 = hashlib.md5()
                         m2.update(m)
                         token = m2.hexdigest()
-                        d = {'code':0, 'msg':'ok', 'time':t, 'token':token}
+                        d = {'code':0, 'msg':'验证码已发送', 'time':t, 'token':token}
                         d = json.dumps(d)
                         self.write(d)
                         self.finish()
@@ -521,7 +523,8 @@ class PCDataRegistHandler(tornado.web.RequestHandler):
         mobile   = self.get_argument('mobile', None)
         passwd   = self.get_argument('password', None)
         sex      = int(self.get_argument('sex', 0))
-        if not mobile or not passwd or sex not in [1,2]:
+        p = '^(1[356789])[0-9]{9}$'
+        if not mobile or not re.match(p, mobile) or not passwd or sex not in [1,2]:
             d = {'code':-1, 'msg':'parameters error'}
             d = json.dumps(d)
             self.write(d)
