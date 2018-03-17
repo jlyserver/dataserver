@@ -176,7 +176,7 @@ class IndexNewHandler(tornado.web.RequestHandler):
         limit = int(self.get_argument('limit', 0))
         page  = int(self.get_argument('page',  0))
         next_ = int(self.get_argument('next',  0))
-        if sex not in [1, 2] or limit < 1 or page < 1 or next_ != 0:
+        if sex not in [1, 2] or limit < 1 or page < 1:
             d = {'code':-1, 'msg':'error', 'data':{}}
             d = json.dumps(d)
             self.write(d)
@@ -187,7 +187,7 @@ class IndexNewHandler(tornado.web.RequestHandler):
             else:
                 key = 'user_new_female'
             val = cache.get(key)
-            if val:
+            if next_ == 0 and  val:
                 cache.set(key, val, conf.redis_timeout)
                 data = json.loads(val)
                 d = {'code': 0, 'msg':'ok', 'data':data}
@@ -301,7 +301,7 @@ class PCDataVerifyHandler(tornado.web.RequestHandler):
         mobile = self.get_argument('mobile', None)
         ip     = self.get_argument('ip', None)
         if not mobile or not re.match(p, mobile) or not ip:
-            d = {'code': -1, 'msg': 'invalid request'}
+            d = {'code': -1, 'msg': '电话号码不正确'}
             d = json.dumps(d)
             self.write(d)
             self.finish()
@@ -326,7 +326,7 @@ class PCDataVerifyHandler(tornado.web.RequestHandler):
             if not d:
                 d = {'code': -1, 'msg': '服务器错误'}
             elif d['code'] < 0:
-                r = {'code': -2,'msg':'手机号码已经注册了'}
+                r = {'code': -2,'msg':d['msg']}
                 r = json.dumps(r)
                 self.write(r)
                 self.finish()
@@ -416,7 +416,7 @@ class PCDataFindVerifyHandler(tornado.web.RequestHandler):
         mobile = self.get_argument('mobile', None)
         ip     = self.get_argument('ip', None)
         if not mobile or not re.match(p, mobile) or not ip:
-            d = {'code': -1, 'msg': 'invalid request'}
+            d = {'code': -1, 'msg': '电话号码不正确'}
             d = json.dumps(d)
             self.write(d)
             self.finish()
@@ -438,8 +438,10 @@ class PCDataFindVerifyHandler(tornado.web.RequestHandler):
                 d = json.loads(r)
             except:
                 d = {}
-            if d.get('code', -1) == -1:
-                r = {'code': -1,'msg':'does not exist'}
+            if not d:
+                d = {'code': -1, 'msg': '服务器错误'}
+            elif d['code'] < 0:
+                r = {'code': -2,'msg':d['msg']}
                 r = json.dumps(r)
                 self.write(r)
                 self.finish()
@@ -451,7 +453,7 @@ class PCDataFindVerifyHandler(tornado.web.RequestHandler):
                 mkey_i = 'verify_%s'%ip
                 mv_i   = cache.get(mkey_i)
                 if mv_n or mv_i:
-                    d = {'code': -1, 'msg': 'not timeout'}
+                    d = {'code': -1, 'msg': '不要频繁发送验证码'}
                     d = json.dumps(d)
                     self.write(d)
                     self.finish()
@@ -466,7 +468,7 @@ class PCDataFindVerifyHandler(tornado.web.RequestHandler):
                     r = sndmsg(mobile, code)
                     print(r)
                     if not r:
-                        d = {'code':-1, 'msg':'invalid number'}
+                        d = {'code':-1, 'msg':'获取验证码失败,可能手机号不正确'}
                         d = json.dumps(d)
                         self.write(d)
                         self.finish()
@@ -489,7 +491,7 @@ class PCDataFindPasswordHandler(tornado.web.RequestHandler):
         passwd = self.get_argument('password', None)
         d = {}
         if not mobile or not passwd:
-            d = {'code': -6, 'msg': 'mobile or password is null'}
+            d = {'code': -6, 'msg': '手机号码和密码不能为空'}
         else:
             url = 'http://%s:%s/find_password' % (conf.dbserver_ip, conf.dbserver_port)
             headers = self.request.headers
@@ -505,13 +507,19 @@ class PCDataFindPasswordHandler(tornado.web.RequestHandler):
             r = resp.body
             D = {}
             try:
-                D = json.loads(D)
+                D = json.loads(r)
             except:
                 D = {}
-            if not D or D.get('code', -1) != 0:
-                d = {'code': -1, 'msg':'failed'}
+            if not D:
+                d = {'code': -5, 'msg': '系统错误'}
             else:
-                d = {'code': 0, 'msg': 'ok'}
+                d = D
+                if D['code'] == 0:
+                    c = D['data']
+                    k = 'userid_%s' % str(c['user']['id'])
+                    v = json.dumps(c)
+                    cache.set(k, v, conf.redis_timeout)
+                    del D['data']
         d = json.dumps(d)
         self.write(d)
         self.finish()
@@ -551,6 +559,18 @@ class PCDataRegistHandler(tornado.web.RequestHandler):
                 d = {'code':-1, 'msg':'服务器错误'}
             else:
                 d = {'code':d['code'], 'msg':d['msg']}
+            if d['code'] == 0:#新注册用户写入cache
+                c = d['data']
+                k = 'userid_%s' % str(c['user']['id'])
+                v = json.dumps(c)
+                cache.set(k, v, conf.redis_timeout)
+                k = 'user_new_male' if sex == 1 else 'user_new_female'
+                v = cache.get(k)
+                if v:
+                    v = json.loads(v)
+                    v.insert(0, c)
+                    v = json.dumps(v)
+                    cache.set(k, v, conf.redis_timeout)
             r = json.dumps(d)
             self.write(r)
             self.finish()
