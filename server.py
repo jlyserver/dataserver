@@ -557,8 +557,6 @@ class PCDataRegistHandler(tornado.web.RequestHandler):
                 d = {}
             if not d:
                 d = {'code':-1, 'msg':'服务器错误'}
-            else:
-                d = {'code':d['code'], 'msg':d['msg']}
             if d['code'] == 0:#新注册用户写入cache
                 c = d['data']
                 k = 'userid_%s' % str(c['user']['id'])
@@ -598,9 +596,10 @@ class PCDataBasicEditHandler(tornado.web.RequestHandler):
         if d.get('code', -1) == 0:
             data = d['data']
             u = data['user']
-            key = 'user_%s_%s' % (u['nick_name'], u['password'])
+            key = 'user_%d' % u['id']
             data = json.dumps(data)
             cache.set(key, data, conf.redis_timeout)
+            del d['data']
         d = json.dumps(d)
         self.write(d)
         self.finish()
@@ -629,7 +628,7 @@ class PCDataStatementEditHandler(tornado.web.RequestHandler):
         if d.get('code', -1) == 0:
             data = d['data']
             u = data['user']
-            key = 'user_%s_%s' % (u['nick_name'], u['password'])
+            key = 'user_%d' % u['id']
             data = json.dumps(data)
             cache.set(key, data, conf.redis_timeout)
         d = json.dumps(d)
@@ -641,16 +640,16 @@ class PCDataOtherEditHandler(tornado.web.RequestHandler):
     @tornado.gen.coroutine
     def post(self):
         ctx = self.get_argument('ctx', None)
-        mo  = self.get_argument('mobile', None)
-        wx  = self.get_argument('wx', None)
-        qq  = self.get_argument('qq', None)
-        em  = self.get_argument('email', None)
+        salary = self.get_argument('salary', None)
+        work   = self.get_argument('work', None)
+        car    = self.get_argument('car', None)
+        house  = self.get_argument('hourse', None)
         if not ctx:
             d = {'code': -1, 'msg': 'invalid'}
             d = json.dumps(d)
             self.write(d)
             self.finish()
-        elif not mo and not wx and not qq and not em:
+        elif not salary and not work and not car and not house:
             d = {'code': -1, 'msg': 'failed'}
             d = json.dumps(d)
             self.write(d)
@@ -676,7 +675,7 @@ class PCDataOtherEditHandler(tornado.web.RequestHandler):
             if d.get('code', -1) == 0:
                 data = d['data']
                 u = data['user']
-                key = 'user_%s_%s' % (u['nick_name'], u['password'])
+                key = 'user_%d' % u['id']
                 data = json.dumps(data)
                 cache.set(key, data, conf.redis_timeout)
                 del d['data']
