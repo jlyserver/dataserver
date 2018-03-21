@@ -1,6 +1,7 @@
 #-*- coding: utf-8 -*-
 
 import redis
+import json
 from conf import conf
 
 class Cache():

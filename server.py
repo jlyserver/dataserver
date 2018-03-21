@@ -596,7 +596,7 @@ class PCDataBasicEditHandler(tornado.web.RequestHandler):
         if d.get('code', -1) == 0:
             data = d['data']
             u = data['user']
-            key = 'user_%d' % u['id']
+            key = 'userid_%d' % u['id']
             data = json.dumps(data)
             cache.set(key, data, conf.redis_timeout)
             del d['data']
@@ -628,7 +628,7 @@ class PCDataStatementEditHandler(tornado.web.RequestHandler):
         if d.get('code', -1) == 0:
             data = d['data']
             u = data['user']
-            key = 'user_%d' % u['id']
+            key = 'userid_%d' % u['id']
             data = json.dumps(data)
             cache.set(key, data, conf.redis_timeout)
         d = json.dumps(d)
@@ -675,14 +675,58 @@ class PCDataOtherEditHandler(tornado.web.RequestHandler):
             if d.get('code', -1) == 0:
                 data = d['data']
                 u = data['user']
-                key = 'user_%d' % u['id']
+                key = 'userid_%d' % u['id']
                 data = json.dumps(data)
                 cache.set(key, data, conf.redis_timeout)
                 del d['data']
             d = json.dumps(d)
             self.write(d)
             self.finish()
-
+class PCDataVerifyOtherHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        kind  = self.get_argument('kind', None)
+        ctx   = self.get_argument('ctx', None)
+        num   = self.get_argument('num', None)
+        d = {}
+        if not ctx or not kind or not num:
+            d = {'code': -1, 'msg': '参数错误'}
+        else:
+            key = 'kind_%s_%s' % (kind, num)
+            val = cache.get(key)
+            if val:
+                d = {'code': -1, 'msg': '30秒之后再发'}
+                d = json.dumps(d)
+            else:
+                cache.set(key, 1, conf.redis_timeout)
+                url = 'http://%s:%s/verify_other' % (conf.dbserver_ip, conf.dbserver_port)
+                headers = self.request.headers
+                body = self.request.body
+                http_client = tornado.httpclient.AsyncHTTPClient()
+                resp = yield tornado.gen.Task(
+                        http_client.fetch,
+                        url,
+                        method="POST",
+                        headers=headers,
+                        body=body,
+                        validate_cert=False)
+                r = resp.body
+                d = {'code': -1, 'msg': 'error'}
+                try:
+                    d = json.loads(r)
+                except:
+                    d = {'code': -1, 'msg': 'error'}
+                if d.get('code', -1) == 0:
+                    data = d['data']
+                    u = data['user']
+                    key = 'userid_%d' % u['id']
+                    data = json.dumps(data)
+                    cache.set(key, data, conf.redis_timeout)
+                    del d['data']
+                d = json.dumps(d)
+        self.write(d)
+        self.finish()
 class PCDataPublishHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
@@ -746,6 +790,7 @@ if __name__ == "__main__":
                (r'/basic_edit', PCDataBasicEditHandler),
                (r'/statement_edit', PCDataStatementEditHandler),
                (r'/other_edit', PCDataOtherEditHandler),
+               (r'/verify_other', PCDataVerifyOtherHandler),
                (r'/new', IndexNewHandler),
                (r'/find', FindHandler),
               #(r'/publish', PCDataPublishHandler),
