@@ -599,6 +599,33 @@ class PCDataBasicEditHandler(tornado.web.RequestHandler):
             key = 'userid_%d' % u['id']
             data = json.dumps(data)
             cache.set(key, data, conf.redis_timeout)
+            
+            key = 'user_new_male' if u['sex'] == 1 else 'user_new_female'
+            val = cache.get(key)
+            if val:
+                tmp = json.loads(val)
+                f = 0
+                for i in xrange(len(tmp)):
+                    if tmp[i]['user']['id'] == u['id']:
+                        tmp[i]['user'] = u
+                        f = 1
+                        break
+                if f:
+                    v = json.dumps(tmp)
+                    cache.set(key, v, conf.redis_timeout)
+            key = 'user_index_find'
+            val = cache.get(key)
+            if val:
+                tmp = json.loads(val)
+                f = 0
+                for i in xrange(len(tmp)):
+                    if tmp[i]['user']['id'] == u['id']:
+                        tmp[i]['user'] = u
+                        f = 1
+                        break
+                if f:
+                    v = json.dumps(tmp)
+                    cache.set(key, v, conf.redis_timeout)
             del d['data']
         d = json.dumps(d)
         self.write(d)
@@ -699,7 +726,7 @@ class PCDataVerifyOtherHandler(tornado.web.RequestHandler):
                 d = {'code': -1, 'msg': '30秒之后再发'}
                 d = json.dumps(d)
             else:
-                cache.set(key, 1, conf.redis_timeout)
+                cache.set(key, 1, 30)
                 url = 'http://%s:%s/verify_other' % (conf.dbserver_ip, conf.dbserver_port)
                 headers = self.request.headers
                 body = self.request.body
@@ -727,7 +754,7 @@ class PCDataVerifyOtherHandler(tornado.web.RequestHandler):
                 d = json.dumps(d)
         self.write(d)
         self.finish()
-class PCDataPublishHandler(tornado.web.RequestHandler):
+class PCDataPublicHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
     def post(self):
@@ -735,12 +762,12 @@ class PCDataPublishHandler(tornado.web.RequestHandler):
         kind    = self.get_argument('kind', None)
         action  = self.get_argument('action', None)
         if not ctx or  not kind or not action:
-            d = {'code': -1, 'msg': 'invalid'}
+            d = {'code': -1, 'msg': '参数不正确'}
             d = json.dumps(d)
             self.write(d)
             self.finish()
         else:
-            url = 'http://%s:%s/publish' % (conf.dbserver_ip, conf.dbserver_port)
+            url = 'http://%s:%s/public' % (conf.dbserver_ip, conf.dbserver_port)
             headers = self.request.headers
             body = self.request.body
             http_client = tornado.httpclient.AsyncHTTPClient()
@@ -752,18 +779,16 @@ class PCDataPublishHandler(tornado.web.RequestHandler):
                     body=body,
                     validate_cert=False)
             r = resp.body
-            d = {'code': -1, 'msg': 'error'}
+            d = {'code': -1, 'msg': '参数不正确'}
             try:
                 d = json.loads(r)
             except:
-                d = {'code': -1, 'msg': 'error'}
+                d = {'code': -3, 'msg': '服务器错误'}
             if d.get('code', -1) == 0:
                 data = d['data']
                 print(data['otherinfo']['public_m'])
                 u = data['user']
-                data = d['data']
-                u = data['user']
-                key = 'user_%s_%s' % (u['nick_name'], u['password'])
+                key = 'userid_%d' % u['id']
                 data = json.dumps(data)
                 cache.set(key, data, conf.redis_timeout)
                 del d['data']
@@ -771,6 +796,147 @@ class PCDataPublishHandler(tornado.web.RequestHandler):
             self.write(d)
             self.finish()
             
+class PCDataISeeHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        uid = self.get_argument('uid', None)
+        d = {'code': -1, 'msg':'参数不正确'}
+        if uid:
+            key = 'isee_%s' % uid
+            val = cache.get(key)
+            if val:
+                cache.set(key, val, conf.redis_timeout)
+                self.write(val)
+                self.finish()
+            else:
+                url = 'http://%s:%s/isee' % (conf.dbserver_ip, conf.dbserver_port)
+                headers = self.request.headers
+                body = self.request.body
+                http_client = tornado.httpclient.AsyncHTTPClient()
+                resp = yield tornado.gen.Task(
+                        http_client.fetch,
+                        url,
+                        method="POST",
+                        headers=headers,
+                        body=body,
+                        validate_cert=False)
+                r = resp.body
+                d = {'code': -1, 'msg': '参数不正确'}
+                try:
+                    d = json.loads(r)
+                except:
+                    d = {'code': -3, 'msg': '服务器错误'}
+                if d.get('code', -1) == 0:
+                    data = d['data']
+                    val = json.dumps(data)
+                    key = 'isee_%s' % uid
+                    cache.set(key, val, conf.redis_timeout)
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+                else:
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+        else:
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
+
+class PCDataSeeMeHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        uid = self.get_argument('uid', None)
+        d = {'code': -1, 'msg':'参数不正确'}
+        if uid:
+            key = 'seeme_%s' % uid
+            val = cache.get(key)
+            if val:
+                cache.set(key, val, conf.redis_timeout)
+                self.write(val)
+                self.finish()
+            else:
+                url = 'http://%s:%s/seeme' % (conf.dbserver_ip, conf.dbserver_port)
+                headers = self.request.headers
+                body = self.request.body
+                http_client = tornado.httpclient.AsyncHTTPClient()
+                resp = yield tornado.gen.Task(
+                        http_client.fetch,
+                        url,
+                        method="POST",
+                        headers=headers,
+                        body=body,
+                        validate_cert=False)
+                r = resp.body
+                d = {'code': -1, 'msg': '参数不正确'}
+                try:
+                    d = json.loads(r)
+                except:
+                    d = {'code': -3, 'msg': '服务器错误'}
+                if d.get('code', -1) == 0:
+                    data = d['data']
+                    val = json.dumps(data)
+                    key = 'seeme_%s' % uid
+                    cache.set(key, val, conf.redis_timeout)
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+                else:
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+        else:
+            d = json.dumps(d)
+            self.write(d)
+
+class PCDataICareHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        uid = self.get_argument('uid', None)
+        d = {'code': -1, 'msg':'参数不正确'}
+        if uid:
+            key = 'icare_%s' % uid
+            val = cache.get(key)
+            if val:
+                cache.set(key, val, conf.redis_timeout)
+                self.write(val)
+                self.finish()
+            else:
+                url = 'http://%s:%s/icare' % (conf.dbserver_ip, conf.dbserver_port)
+                headers = self.request.headers
+                body = self.request.body
+                http_client = tornado.httpclient.AsyncHTTPClient()
+                resp = yield tornado.gen.Task(
+                        http_client.fetch,
+                        url,
+                        method="POST",
+                        headers=headers,
+                        body=body,
+                        validate_cert=False)
+                r = resp.body
+                d = {'code': -1, 'msg': '参数不正确'}
+                try:
+                    d = json.loads(r)
+                except:
+                    d = {'code': -3, 'msg': '服务器错误'}
+                if d.get('code', -1) == 0:
+                    data = d['data']
+                    val = json.dumps(data)
+                    key = 'icare_%s' % uid
+                    cache.set(key, val, conf.redis_timeout)
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+                else:
+                    d = json.dumps(d)
+                    self.write(d)
+                    self.finish()
+        else:
+            d = json.dumps(d)
+            self.write(d)
 
 if __name__ == "__main__":
     tornado.options.parse_command_line()
@@ -793,7 +959,11 @@ if __name__ == "__main__":
                (r'/verify_other', PCDataVerifyOtherHandler),
                (r'/new', IndexNewHandler),
                (r'/find', FindHandler),
-              #(r'/publish', PCDataPublishHandler),
+               (r'/public', PCDataPublicHandler),
+               (r'/isee', PCDataISeeHandler),
+               (r'/seeme', PCDataSeeMeHandler),
+               (r'/icare', PCDataICareHandler),
+              #(r'/seeme', PCDataSeeMeHandler),
               ]
     application = tornado.web.Application(handler, **settings)
     http_server = tornado.httpserver.HTTPServer(application)
