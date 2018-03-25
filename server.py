@@ -1029,6 +1029,8 @@ class PCDataCreateDatingHandler(tornado.web.RequestHandler):
                 d = json.loads(r)
             except:
                 d = {'code': -1, 'msg': '服务器错误'}
+            if d['code'] == 0:
+                cache.delpat('date_*')
         d = json.dumps(d)
         self.write(d)
         self.finish()
