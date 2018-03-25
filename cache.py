@@ -22,8 +22,23 @@ class Cache():
         return r
     def flushall(self):
         r = self.rds.flushall()
+    def getkeys(self, k):
+        r = self.rds.keys(k)
+        return r
+    def delpat(self, k):
+        self.rds.delete(*self.rds.keys(k))
 
 cache = Cache()
 
 if __name__ == '__main__':
-    r = cache.flushall()
+    k = 'abc_%d'
+    a = [123, 456, 789]
+    for e in a:
+        key = k % e
+        cache.set(key, e)
+    v = cache.getkeys('abc_*')
+    print(v)
+    cache.delpat('abc*')
+    v = cache.getkeys('abc_*')
+    print(v)
+
