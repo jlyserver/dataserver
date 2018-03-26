@@ -1162,6 +1162,96 @@ class PCDataSponsorDatingHandler(tornado.web.RequestHandler):
                 d = json.dumps(d)
                 self.write(d)
                 self.finish()
+
+class PCDataDetailDatingHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        did   = self.get_argument('did', None)
+        d = {}
+        if not did:
+            d = {'code': -1, 'msg': '参数不正确'}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
+        else:
+            key = 'date_detail_%s'% did
+            val = cache.get(key)
+            if val:
+                cache.set(key, val, conf.redis_timeout)
+                v = json.loads(val)
+                d = {'code': 0, 'msg':'ok', 'data': v}
+                d = json.dumps(d)
+                self.write(d)
+                self.finish()
+            else:
+                url = 'http://%s:%s/detail_dating' % (conf.dbserver_ip, conf.dbserver_port)
+                headers = self.request.headers
+                body = self.request.body
+                http_client = tornado.httpclient.AsyncHTTPClient()
+                resp = yield tornado.gen.Task(
+                        http_client.fetch,
+                        url,
+                        method="POST",
+                        headers=headers,
+                        body=body,
+                        validate_cert=False)
+                r = resp.body
+                try:
+                    d = json.loads(r)
+                except:
+                    d = {'code':-1, 'msg': '服务器错误'}
+                if d['code'] == 0:
+                    data = d['data']
+                    v = json.dumps(data)
+                    cache.set(key, v, conf.redis_timeout)
+                d = json.dumps(d)
+                self.write(d)
+                self.finish()
+
+class PCDataBaomingDatingHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        did   = self.get_argument('did', None)
+        uid   = self.get_argument('uid', None)
+        d = {}
+        if not did:
+            d = {'code': -1, 'msg': '参数不正确'}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
+        else:
+            url = 'http://%s:%s/baoming_dating' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            try:
+                d = json.loads(r)
+            except:
+                d = {'code':-1, 'msg': '服务器错误'}
+            if d['code'] == 0:
+                key = 'date_detail_%s' % did
+                val = cache.get(key)
+                if val:
+                    v = json.loads(val)
+                    v['baoming'].append(uid)
+                    v = json.dumps(v)
+                    cache.set(key, v, conf.redis_timeout)
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
+
+
+
 if __name__ == "__main__":
     tornado.options.parse_command_line()
     settings = {
@@ -1193,6 +1283,8 @@ if __name__ == "__main__":
                (r'/remove_dating', PCDataRemoveDatingHandler),
                (r'/participate_dating', PCDataParticipateDatingHandler),
                (r'/sponsor_dating', PCDataSponsorDatingHandler),
+               (r'/detail_dating', PCDataDetailDatingHandler),
+               (r'/baoming_dating',PCDataBaomingDatingHandler),
               ]
     application = tornado.web.Application(handler, **settings)
     http_server = tornado.httpserver.HTTPServer(application)
