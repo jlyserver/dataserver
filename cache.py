@@ -31,14 +31,4 @@ class Cache():
 cache = Cache()
 
 if __name__ == '__main__':
-    k = 'abc_%d'
-    a = [123, 456, 789]
-    for e in a:
-        key = k % e
-        cache.set(key, e)
-    v = cache.getkeys('abc_*')
-    print(v)
-    cache.delpat('abc*')
-    v = cache.getkeys('abc_*')
-    print(v)
-
+    cache.flushall()

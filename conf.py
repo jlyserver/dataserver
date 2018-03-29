@@ -35,6 +35,8 @@ class Loginconf():
         self.table_guanzhu              = p.get('table', 'table_guanzhu')
         self.table_email                = p.get('table', 'table_email')
         self.table_email_content        = p.get('table', 'table_email_content')
+        self.pic_ip                     = p.get('pic', 'pic_ip')
+        self.postfix                    = p.get('pic', 'postfix')
 
     def dis(self):
         print(self.sys_ip)

@@ -1,4 +1,8 @@
 #-*- coding: utf-8 -*-
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 import tornado.httpclient
 import tornado.httpserver
 import tornado.ioloop
@@ -292,6 +296,93 @@ class FindHandler(tornado.web.RequestHandler):
                 d = json.dumps(d)
                 self.write(d)
                 self.finish()
+
+class PCDataImgHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        uid = self.get_argument('uid', None)
+        f   = self.get_argument('f',   None)
+        s   = self.get_argument('s',   None)
+        t   = self.get_argument('t',   None)
+        k   = self.get_argument('k',   None)
+        if not uid or not f or not s or not t or not k:
+            d = {'code': -1, 'msg': '参数不正确'}
+        else:
+            url = 'http://%s:%s/img' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
+                d = {}
+            if not d:
+                d = {'code': -1, 'msg': '服务器错误'}
+            if d['code'] == 0:
+                key = 'userid_%s' % uid
+                cache.del_(key)
+            d = json.dumps(d)
+        self.write(d)
+        self.finish()
+
+class PCDataDelImgHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        uid = self.get_argument('uid', None)
+        src = self.get_argument('src', None)
+        d = {'code': -2, 'msg': '参数不正确'}
+        if not uid or not src:
+            d = {'code': -2, 'msg': '参数不正确'}
+        else:
+            url = 'http://%s:%s/delimg' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = 'uid=%s&src=%s' % (uid, src)
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {'code': -3, 'msg': '服务器错误'}
+            try:
+                d = json.loads(r)
+            except:
+                d = {'code': -3, 'msg': '服务器错误'}
+            if d['code'] == 0:
+                key = 'userid_%s' % uid
+                val = cache.get(key)
+                if val:
+                    v = json.loads(val)
+                    t_src = '%s/%s/%s' % (conf.pic_ip, src, conf.postfix)
+                    for i in xrange(len(v['pic']['arr'])):
+                        if v['pic']['arr'][i] == t_src:
+                            j = i
+                            while j+1 < len(v['pic']['arr']):
+                                v['pic']['arr'][j] = v['pic']['arr'][j+1]
+                                j = j+1
+                            break
+                    v['pic']['count'] = v['pic']['count'] + 1
+                    v = json.dumps(v)
+                    cache.set(key, v, conf.redis_timeout)
+        d = json.dumps(d)
+        self.write(d)
+        self.finish()
+                
+            
 
 class PCDataVerifyHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -814,7 +905,10 @@ class PCDataISeeHandler(tornado.web.RequestHandler):
             val = cache.get(key)
             if val:
                 cache.set(key, val, conf.redis_timeout)
-                self.write(val)
+                v = json.loads(val)
+                d = {'code': 0, 'msg':'ok', 'data':v}
+                d = json.dumps(d)
+                self.write(d)
                 self.finish()
             else:
                 url = 'http://%s:%s/isee' % (conf.dbserver_ip, conf.dbserver_port)
@@ -840,12 +934,10 @@ class PCDataISeeHandler(tornado.web.RequestHandler):
                     key = 'isee_%s' % uid
                     cache.set(key, val, conf.redis_timeout)
                     d = json.dumps(d)
-                    self.write(d)
-                    self.finish()
                 else:
                     d = json.dumps(d)
-                    self.write(d)
-                    self.finish()
+                self.write(d)
+                self.finish()
         else:
             d = json.dumps(d)
             self.write(d)
@@ -1273,6 +1365,8 @@ if __name__ == "__main__":
                (r'/verify_other', PCDataVerifyOtherHandler),
                (r'/new', IndexNewHandler),
                (r'/find', FindHandler),
+               (r'/img', PCDataImgHandler),
+               (r'/delimg', PCDataDelImgHandler),
                (r'/public', PCDataPublicHandler),
                (r'/isee', PCDataISeeHandler),
                (r'/seeme', PCDataSeeMeHandler),

@@ -32,3 +32,7 @@ table_kanguo=kanguo
 table_guanzhu=guanzhu
 table_email=email
 table_email_content=email_content
+
+[pic]
+pic_ip=http://47.94.105.76
+postfix=2_600×800.jpg
