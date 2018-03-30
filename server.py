@@ -195,8 +195,6 @@ class IndexNewHandler(tornado.web.RequestHandler):
                 cache.set(key, val, conf.redis_timeout)
                 data = json.loads(val)
                 d = {'code': 0, 'msg':'ok', 'data':data}
-                print('sex=%d'%sex)
-                print(d)
                 d = json.dumps(d)
                 self.write(d)
                 self.finish()
@@ -217,8 +215,6 @@ class IndexNewHandler(tornado.web.RequestHandler):
                     d = json.loads(resp.body)
                 except:
                     d = None
-                print('sex=%d'%sex)
-                print(d)
                 r = None
                 if not d or d.get('code', -1) < 0:
                     r = {'code': -1, 'msg':'failed', 'data':{}}
@@ -954,7 +950,10 @@ class PCDataSeeMeHandler(tornado.web.RequestHandler):
             val = cache.get(key)
             if val:
                 cache.set(key, val, conf.redis_timeout)
-                self.write(val)
+                v = json.loads(val)
+                d = {'code': 0, 'msg':'ok', 'data': v}
+                d = json.dumps(d)
+                self.write(d)
                 self.finish()
             else:
                 url = 'http://%s:%s/seeme' % (conf.dbserver_ip, conf.dbserver_port)
@@ -1001,7 +1000,10 @@ class PCDataICareHandler(tornado.web.RequestHandler):
             val = cache.get(key)
             if val:
                 cache.set(key, val, conf.redis_timeout)
-                self.write(val)
+                v = json.loads(val)
+                d = {'code': 0, 'msg':'ok', 'data': v}
+                d = json.dumps(d)
+                self.write(d)
                 self.finish()
             else:
                 url = 'http://%s:%s/icare' % (conf.dbserver_ip, conf.dbserver_port)
