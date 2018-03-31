@@ -803,6 +803,59 @@ class PCDataOtherEditHandler(tornado.web.RequestHandler):
             d = json.dumps(d)
             self.write(d)
             self.finish()
+class PCDataSeeOtherHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        kind = int(self.get_argument('kind', 0))
+        uid  = self.get_argument('uid', None)
+        cuid = self.get_argument('cuid', None)
+        d = {'code': -1, 'msg': '参数错误'}
+        if kind not in [1,2,3,4] or not uid or not cuid:
+            d = {'code': -1, 'msg': '参数错误'}
+        else:
+            key = 'seeother_%s_%s_%s' % (cuid, uid, kind)
+            val = cache.get(key)
+            if val:
+                cache.set(key, val, conf.redis_timeout)
+                d = {'code': 0, 'msg': 'ok', 'data':val}
+            else:
+                url = 'http://%s:%s/seeother' % (conf.dbserver_ip, conf.dbserver_port)
+                headers = self.request.headers
+                body = self.request.body
+                http_client = tornado.httpclient.AsyncHTTPClient()
+                resp = yield tornado.gen.Task(
+                        http_client.fetch,
+                        url,
+                        method="POST",
+                        headers=headers,
+                        body=body,
+                        validate_cert=False)
+                r = resp.body
+                d = {}
+                try:
+                    d = json.loads(r)
+                except:
+                    d = {}
+                if not d:
+                    d = {'code': -2, 'msg': '服务器错误'}
+                if d['code'] == 0:
+                    data = d['data']
+                    ac = data['account']
+                    cookie = 'userid_%s' % cuid
+                    cv = cache.get(cookie)
+                    if cv:
+                        cvd = json.loads(cv)
+                        cvd['account'] = ac
+                        cvd = json.dumps(cvd)
+                        cache.set(cookie, cvd, conf.redis_timeout)
+                    data = json.dumps(data)
+                    conn = data['conn']
+                    cache.set(key, conn, conf.redis_timeout)
+        d = json.dumps(d)
+        self.write(d)
+        self.finish()
+
 class PCDataVerifyOtherHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
@@ -1364,6 +1417,7 @@ if __name__ == "__main__":
                (r'/basic_edit', PCDataBasicEditHandler),
                (r'/statement_edit', PCDataStatementEditHandler),
                (r'/other_edit', PCDataOtherEditHandler),
+               (r'/seeother', PCDataSeeOtherHandler),
                (r'/verify_other', PCDataVerifyOtherHandler),
                (r'/new', IndexNewHandler),
                (r'/find', FindHandler),
