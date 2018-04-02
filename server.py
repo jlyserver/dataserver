@@ -853,6 +853,7 @@ class PCDataSeeOtherHandler(tornado.web.RequestHandler):
                         cvd = json.dumps(cvd)
                         cache.set(cookie, cvd, conf.redis_timeout)
                     conn = data['conn']
+                    d = {'code': 0, 'msg': 'ok', 'data': conn}
                     conn = json.dumps(conn)
                     cache.set(key, conn, conf.redis_timeout)
         d = json.dumps(d)
@@ -980,11 +981,12 @@ class PCDataPublicHandler(tornado.web.RequestHandler):
                 d = {'code': -3, 'msg': '服务器错误'}
             if d.get('code', -1) == 0:
                 data = d['data']
-                print(data['otherinfo']['public_m'])
                 u = data['user']
                 key = 'userid_%d' % u['id']
                 data = json.dumps(data)
                 cache.set(key, data, conf.redis_timeout)
+                k = 'sawother_*_%d' % u['id']
+                cache.delpat(k)
                 del d['data']
             d = json.dumps(d)
             self.write(d)
@@ -1139,6 +1141,43 @@ class PCDataICareHandler(tornado.web.RequestHandler):
             d = json.dumps(d)
             self.write(d)
 
+class PCDataSendCareHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        cuid  = self.get_argument('cuid', None)
+        uid   = self.get_argument('uid',  None)
+        kind  = self.get_argument('kind', None)
+        d = {}
+        if not cuid or not uid or not kind:
+            d = {'code': -1, 'msg': '参数不正确'}
+        else:
+            url = 'http://%s:%s/sendcare' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
+                d = {}
+            if not d:
+                d = {'code':-1, 'msg': '服务器错误'}
+            if d['code'] == 0:
+                key = 'icare_%s' % cuid
+                cache.del_(key)
+        d = json.dumps(d)
+        self.write(d)
+        self.finish()
+
 class PCDataEmailHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
@@ -1262,6 +1301,40 @@ class PCDataSendEmailHandler(tornado.web.RequestHandler):
         d = json.dumps(d)
         self.write(d)
         self.finish()
+
+class PCDataDelEmailHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self):
+        eid = self.get_argument('eid', None)
+        uid = self.get_argument('uid', None)
+        d = {}
+        if not eid or not uid:
+            d = {'code': -1, 'msg': '参数错误'}
+        else:
+            url = 'http://%s:%s/del_email' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
+                d = {}
+            if not d:
+                d = {'code': -1, 'msg':'服务器错误'}
+        d = json.dumps(d)
+        self.write(d)
+        self.finish()
+            
 
 class PCDataYanyuanHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -1686,10 +1759,12 @@ if __name__ == "__main__":
                (r'/isee', PCDataISeeHandler),
                (r'/seeme', PCDataSeeMeHandler),
                (r'/icare', PCDataICareHandler),
+               (r'/sendcare', PCDataSendCareHandler),
                (r'/email', PCDataEmailHandler),
                (r'/latest_conn', PCDataLatestConnHandler),
                (r'/latest_conn', PCDataLatestConnHandler),
                (r'/sendemail', PCDataSendEmailHandler),
+               ('/del_email',  PCDataDelEmailHandler),
                (r'/yanyuan', PCDataYanyuanHandler),
                (r'/yanyuan_check', PCDataYanyuanCheckHandler),
                (r'/list_dating', PCDataListDatingHandler),
