@@ -1189,45 +1189,25 @@ class PCDataEmailHandler(tornado.web.RequestHandler):
         if not uid or not page or not next_:
             d = {'code': 0, 'msg': '参数不正确'}
         else:
-            key = 'email_list_%s_%s_%s' % (uid, page, next_)
-            val = cache.get(key)
-            if val:
-                v = json.loads(val)
-                for i in xrange(len(v['in'])):
-                    k_ = v['in'][i]['mail']['id']
-                    k_ = 'see_email_%d'%k_
-                    v_ = cache.get(k_)
-                    if v_:
-                        cache.set(k_, v_, conf.redis_timeout)
-                        v['in'][i]['mail']['read'] = 1
-                        v['in']['unread'] = 0 if v['in']['unread'] <= 1 else v['in']['unread']-1
-                val = json.dumps(v)
-                d = {'code': 0, 'msg': 'ok', 'data': v}
-                cache.set(key, val, conf.redis_timeout)
-            else:
-                url = 'http://%s:%s/email' % (conf.dbserver_ip, conf.dbserver_port)
-                headers = self.request.headers
-                body = self.request.body
-                http_client = tornado.httpclient.AsyncHTTPClient()
-                resp = yield tornado.gen.Task(
-                        http_client.fetch,
-                        url,
-                        method="POST",
-                        headers=headers,
-                        body=body,
-                        validate_cert=False)
-                r = resp.body
+            url = 'http://%s:%s/email' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
                 d = {}
-                try:
-                    d = json.loads(r)
-                except:
-                    d = {}
-                if not d:
-                    d = {'code': -1, 'msg': '服务器错误'}
-                if d['code'] == 0:
-                    data = d['data']
-                    v = json.dumps(data)
-                    cache.set(key, v, conf.redis_timeout)
+            if not d:
+                d = {'code': -1, 'msg': '服务器错误'}
         d = json.dumps(d)
         self.write(d)
         self.finish()
@@ -1522,10 +1502,7 @@ class PCDataCreateDatingHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
     def post(self):
-        name       = self.get_argument('nick_name', None)
         uid        = self.get_argument('uid', None)
-        age        = int(self.get_argument('age', 18))
-        sex        = self.get_argument('sex', None)
         sjt        = self.get_argument('subject', None)
         dt         = int(self.get_argument('dtime', 1)) 
         loc1       = self.get_argument('loc1', '') 
@@ -1537,7 +1514,7 @@ class PCDataCreateDatingHandler(tornado.web.RequestHandler):
         bc         = self.get_argument('bc', '') 
         vt         = self.get_argument('valid_time', 1)
         d = {'code': 0, 'msg': 'ok'}
-        if not name or not uid or not sex or not sjt:
+        if not uid or not sjt:
             d = {'code':-1, 'msg':'参数不正确'}
         if not loc1 and not loc2:
             d = {'code':-1, 'msg':'参数不正确'}
