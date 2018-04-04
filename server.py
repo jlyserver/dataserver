@@ -1503,16 +1503,16 @@ class PCDataCreateDatingHandler(tornado.web.RequestHandler):
     @tornado.gen.coroutine
     def post(self):
         uid        = self.get_argument('uid', None)
-        sjt        = self.get_argument('subject', None)
-        dt         = int(self.get_argument('dtime', 1)) 
+        sjt        = self.get_argument('sjt', None)
+        dt         = self.get_argument('dt', None) 
         loc1       = self.get_argument('loc1', '') 
         loc2       = self.get_argument('loc2', '') 
         locd       = self.get_argument('locd', None)
-        obj        = self.get_argument('object', None)
+        obj        = self.get_argument('obj', None)
         num        = self.get_argument('num', 1)
         fee        = self.get_argument('fee', 0)
         bc         = self.get_argument('bc', '') 
-        vt         = self.get_argument('valid_time', 1)
+        vt         = self.get_argument('vt', 1)
         d = {'code': 0, 'msg': 'ok'}
         if not uid or not sjt:
             d = {'code':-1, 'msg':'参数不正确'}
@@ -1535,8 +1535,6 @@ class PCDataCreateDatingHandler(tornado.web.RequestHandler):
                 d = json.loads(r)
             except:
                 d = {'code': -1, 'msg': '服务器错误'}
-            if d['code'] == 0:
-                cache.delpat('date_*')
         d = json.dumps(d)
         self.write(d)
         self.finish()
