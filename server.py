@@ -1458,45 +1458,31 @@ class PCDataListDatingHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
     def post(self):
-        next_ = int(self.get_argument('next', 0))
-        loc1  = self.get_argument('loc1', 'loc1')
-        loc2  = self.get_argument('loc2', 'loc2')
-        age1  = int(self.get_argument('age1', 18))
-        age2  = int(self.get_argument('age2', 18))
-        sex   = int(self.get_argument('sex', 3))
-        key = 'date_%d_%s_%s_%d_%d_%d' % (next_, loc1, loc2, age1, age2, sex)
-        val = cache.get(key)
-        if val:
-            cache.set(key, val, conf.redis_timeout)
-            val = json.loads(val)
-            d = {'code':0, 'msg':'ok', 'data': val}
-            d = json.dumps(d)
-            self.write(d)
-            self.finish()
-        else:
-            url = 'http://%s:%s/list_dating' % (conf.dbserver_ip, conf.dbserver_port)
-            headers = self.request.headers
-            body = self.request.body
-            http_client = tornado.httpclient.AsyncHTTPClient()
-            resp = yield tornado.gen.Task(
-                    http_client.fetch,
-                    url,
-                    method="POST",
-                    headers=headers,
-                    body=body,
-                    validate_cert=False)
-            r = resp.body
-            d = {'code': -1, 'msg': '参数不正确'}
-            try:
-                d = json.loads(r)
-            except:
-                d = {'code': -1, 'msg': '服务器错误'}
-            if d.get('code', -1) == 0:
-                data = d['data']
-                val = json.dumps(data)
-                cache.set(key, val, conf.redis_timeout)
-            self.write(r)
-            self.finish()
+        next_ = self.get_argument('next', None)
+        loc1  = self.get_argument('loc1', None)
+        loc2  = self.get_argument('loc2', None)
+        age1  = self.get_argument('age1', None)
+        age2  = self.get_argument('age2', None)
+        sex   = self.get_argument('sex', None)
+        url = 'http://%s:%s/list_dating' % (conf.dbserver_ip, conf.dbserver_port)
+        headers = self.request.headers
+        body = self.request.body
+        http_client = tornado.httpclient.AsyncHTTPClient()
+        resp = yield tornado.gen.Task(
+                http_client.fetch,
+                url,
+                method="POST",
+                headers=headers,
+                body=body,
+                validate_cert=False)
+        r = resp.body
+        d = {'code': -1, 'msg': '参数不正确'}
+        try:
+            d = json.loads(r)
+        except:
+            d = {'code': -1, 'msg': '服务器错误'}
+        self.write(r)
+        self.finish()
 
 class PCDataCreateDatingHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -1585,39 +1571,25 @@ class PCDataParticipateDatingHandler(tornado.web.RequestHandler):
             self.write(d)
             self.finish()
         else:
-            key = 'date_part_%s_%d_%d_%d' % (uid, limit, page, next_)
-            val = cache.get(key)
-            if val:
-                cache.set(key, val, conf.redis_timeout)
-                v = json.loads(val)
-                d = {'code': 0, 'msg': 'ok', 'data': v}
-                d = json.dumps(d)
-                self.write(d)
-                self.finish()
-            else:
-                url = 'http://%s:%s/participate_dating' % (conf.dbserver_ip, conf.dbserver_port)
-                headers = self.request.headers
-                body = self.request.body
-                http_client = tornado.httpclient.AsyncHTTPClient()
-                resp = yield tornado.gen.Task(
-                        http_client.fetch,
-                        url,
-                        method="POST",
-                        headers=headers,
-                        body=body,
-                        validate_cert=False)
-                r = resp.body
-                try:
-                    d = json.loads(r)
-                except:
-                    d = {'code':-1, 'msg': '服务器错误'}
-                if d['code'] == 0:
-                    data = d['data']
-                    v = json.dumps(data)
-                    cache.set(key, v, conf.redis_timeout)
-                d = json.dumps(d)
-                self.write(d)
-                self.finish()
+            url = 'http://%s:%s/participate_dating' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            try:
+                d = json.loads(r)
+            except:
+                d = {'code':-1, 'msg': '服务器错误'}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
 
 class PCDataSponsorDatingHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -1672,46 +1644,34 @@ class PCDataDetailDatingHandler(tornado.web.RequestHandler):
     @tornado.gen.coroutine
     def post(self):
         did   = self.get_argument('did', None)
+        cuid  = self.get_argument('cuid', None)
         d = {}
-        if not did:
+        if not did or not cuid:
             d = {'code': -1, 'msg': '参数不正确'}
             d = json.dumps(d)
             self.write(d)
             self.finish()
         else:
-            key = 'date_detail_%s'% did
-            val = cache.get(key)
-            if val:
-                cache.set(key, val, conf.redis_timeout)
-                v = json.loads(val)
-                d = {'code': 0, 'msg':'ok', 'data': v}
-                d = json.dumps(d)
-                self.write(d)
-                self.finish()
-            else:
-                url = 'http://%s:%s/detail_dating' % (conf.dbserver_ip, conf.dbserver_port)
-                headers = self.request.headers
-                body = self.request.body
-                http_client = tornado.httpclient.AsyncHTTPClient()
-                resp = yield tornado.gen.Task(
-                        http_client.fetch,
-                        url,
-                        method="POST",
-                        headers=headers,
-                        body=body,
-                        validate_cert=False)
-                r = resp.body
-                try:
-                    d = json.loads(r)
-                except:
-                    d = {'code':-1, 'msg': '服务器错误'}
-                if d['code'] == 0:
-                    data = d['data']
-                    v = json.dumps(data)
-                    cache.set(key, v, conf.redis_timeout)
-                d = json.dumps(d)
-                self.write(d)
-                self.finish()
+            url = 'http://%s:%s/detail_dating' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            d = {}
+            try:
+                d = json.loads(r)
+            except:
+                d = {'code':-1, 'msg': '服务器错误'}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
 
 class PCDataBaomingDatingHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -1788,7 +1748,6 @@ if __name__ == "__main__":
                (r'/sendcare', PCDataSendCareHandler),
                (r'/email', PCDataEmailHandler),
                (r'/see_email', PCDataSeeEmailHandler),
-               (r'/latest_conn', PCDataLatestConnHandler),
                (r'/latest_conn', PCDataLatestConnHandler),
                (r'/sendemail', PCDataSendEmailHandler),
                ('/del_email',  PCDataDelEmailHandler),
