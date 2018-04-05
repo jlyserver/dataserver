@@ -979,15 +979,6 @@ class PCDataPublicHandler(tornado.web.RequestHandler):
                 d = json.loads(r)
             except:
                 d = {'code': -3, 'msg': '服务器错误'}
-            if d.get('code', -1) == 0:
-                data = d['data']
-                u = data['user']
-                key = 'userid_%d' % u['id']
-                data = json.dumps(data)
-                cache.set(key, data, conf.redis_timeout)
-                k = 'sawother_*_%d' % u['id']
-                cache.delpat(k)
-                del d['data']
             d = json.dumps(d)
             self.write(d)
             self.finish()
