@@ -1542,8 +1542,6 @@ class PCDataRemoveDatingHandler(tornado.web.RequestHandler):
                 d = json.loads(r)
             except:
                 d = {'code': -1, 'msg': '服务器错误'}
-            if d['code'] == 0:
-                cache.delpat('date_*')
         d = json.dumps(d)
         self.write(d)
         self.finish()
@@ -1587,48 +1585,34 @@ class PCDataSponsorDatingHandler(tornado.web.RequestHandler):
     @tornado.gen.coroutine
     def post(self):
         uid   = self.get_argument('uid', None)
-        limit = int(self.get_argument('limit', 0))
-        page  = int(self.get_argument('page', 0))
-        next_ = int(self.get_argument('next', 0))
+        limit = self.get_argument('limit', 0)
+        page  = self.get_argument('page', 0)
+        next_ = self.get_argument('next', 0)
         if not uid:
             d = {'code': -1, 'msg': '参数不正确'}
             d = json.dumps(d)
             self.write(d)
             self.finish()
         else:
-            key = 'date_sponsor_%s_%d_%d_%d' % (uid, limit, page, next_)
-            val = cache.get(key)
-            if val:
-                cache.set(key, val, conf.redis_timeout)
-                v = json.loads(val)
-                d = {'code': 0, 'msg': 'ok', 'data': v}
-                d = json.dumps(d)
-                self.write(d)
-                self.finish()
-            else:
-                url = 'http://%s:%s/sponsor_dating' % (conf.dbserver_ip, conf.dbserver_port)
-                headers = self.request.headers
-                body = self.request.body
-                http_client = tornado.httpclient.AsyncHTTPClient()
-                resp = yield tornado.gen.Task(
-                        http_client.fetch,
-                        url,
-                        method="POST",
-                        headers=headers,
-                        body=body,
-                        validate_cert=False)
-                r = resp.body
-                try:
-                    d = json.loads(r)
-                except:
-                    d = {'code':-1, 'msg': '服务器错误'}
-                if d['code'] == 0:
-                    data = d['data']
-                    v = json.dumps(data)
-                    cache.set(key, v, conf.redis_timeout)
-                d = json.dumps(d)
-                self.write(d)
-                self.finish()
+            url = 'http://%s:%s/sponsor_dating' % (conf.dbserver_ip, conf.dbserver_port)
+            headers = self.request.headers
+            body = self.request.body
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            resp = yield tornado.gen.Task(
+                    http_client.fetch,
+                    url,
+                    method="POST",
+                    headers=headers,
+                    body=body,
+                    validate_cert=False)
+            r = resp.body
+            try:
+                d = json.loads(r)
+            except:
+                d = {'code':-1, 'msg': '服务器错误'}
+            d = json.dumps(d)
+            self.write(d)
+            self.finish()
 
 class PCDataDetailDatingHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
@@ -1693,14 +1677,6 @@ class PCDataBaomingDatingHandler(tornado.web.RequestHandler):
                 d = json.loads(r)
             except:
                 d = {'code':-1, 'msg': '服务器错误'}
-            if d['code'] == 0:
-                key = 'date_detail_%s' % did
-                val = cache.get(key)
-                if val:
-                    v = json.loads(val)
-                    v['baoming'].append(uid)
-                    v = json.dumps(v)
-                    cache.set(key, v, conf.redis_timeout)
             d = json.dumps(d)
             self.write(d)
             self.finish()
